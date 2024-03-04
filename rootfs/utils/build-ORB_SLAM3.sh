@@ -16,4 +16,4 @@ export ROS_PACKAGE_PATH=${ROS_PACKAGE_PATH}:`pwd`/Examples_old/ROS/
 cd Examples_old/ROS/ORB_SLAM3/
 cmake -B build
 make -C build -j
-
+ldconfig
