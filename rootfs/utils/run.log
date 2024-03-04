@@ -1,0 +1,1 @@
+src/ORB_SLAM3/Examples/Monocular/mono_tum src/ORB_SLAM3/Vocabulary/ORBvoc.txt ./TAMU-2160.yaml data/OIS/20231026/images
