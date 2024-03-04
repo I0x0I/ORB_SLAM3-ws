@@ -1,0 +1,158 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index cbdf10a..4c835d2 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -193,6 +193,10 @@ add_executable(mono_tum
+         Examples/Monocular/mono_tum.cc)
+ target_link_libraries(mono_tum ${PROJECT_NAME})
+ 
++add_executable(opt_g2o
++        src/opt_g2o.cpp)
++target_link_libraries(opt_g2o ${PROJECT_NAME})
++
+ add_executable(mono_kitti
+         Examples/Monocular/mono_kitti.cc)
+ target_link_libraries(mono_kitti ${PROJECT_NAME})
+diff --git a/src/opt_g2o.cpp b/src/opt_g2o.cpp
+index e69de29..e0601a6 100644
+--- a/src/opt_g2o.cpp
++++ b/src/opt_g2o.cpp
+@@ -0,0 +1,138 @@
++#include <iostream>
++#include <fstream>
++#include <string>
++#include <vector>
++
++#include<opencv2/core/core.hpp>
++#include<Eigen/Dense>
++
++#include "Optimizer.h"
++
++#include <complex>
++
++#include <Eigen/StdVector>
++#include <Eigen/Dense>
++#include <unsupported/Eigen/MatrixFunctions>
++
++#include "Thirdparty/g2o/g2o/core/sparse_block_matrix.h"
++#include "Thirdparty/g2o/g2o/core/block_solver.h"
++#include "Thirdparty/g2o/g2o/core/optimization_algorithm_levenberg.h"
++#include "Thirdparty/g2o/g2o/core/optimization_algorithm_gauss_newton.h"
++#include "Thirdparty/g2o/g2o/solvers/linear_solver_eigen.h"
++#include "Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
++#include "Thirdparty/g2o/g2o/core/robust_kernel_impl.h"
++#include "Thirdparty/g2o/g2o/solvers/linear_solver_dense.h"
++#include "G2oTypes.h"
++#include "Converter.h"
++
++#include <mutex>
++
++#include "OptimizableTypes.h"
++
++
++#include <chrono>
++
++#define ORG 0
++#define INC 1
++
++double K_Arr[10000][4];
++std::map<int, double *> K;
++
++
++int fromId, toId;
++int poseNUM, landmarkNUM, edgeNUM;
++std::vector<g2o::VertexSE3Expmap *> pose;
++std::vector<g2o::VertexSBAPointXYZ *> landmark;
++std::vector<g2o::EdgeSE3ProjectXYZ *> observation;
++
++int main(int argc, char *argv[]) {
++  if(argc != 3) {
++    std::cout << "usage: opt_g2o test.g2o K.txt" << std::endl;
++    return -1;
++  }
++
++
++  //Set Optimizer
++  g2o::SparseOptimizer optimizer;
++  g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
++  linearSolver = new g2o::LinearSolverEigen<g2o::BlockSolver_6_3::PoseMatrixType>();
++
++  g2o::BlockSolver_6_3 * solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
++  g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
++  optimizer.setAlgorithm(solver);
++  optimizer.setVerbose(false);
++
++  //Load K
++  double fx, fy, cx, cy;
++  std::ifstream KFile;
++  KFile.open(argv[2]);
++  KFile >> poseNUM;
++  std::cout << poseNUM << std::endl;
++  for(int i = 0; i < poseNUM; i++) {
++     KFile >> fromId >> fx >> fy >> cx >> cy;
++     K[fromId] = K_Arr[i];
++     K[fromId][0] = fx;
++     K[fromId][1] = fy;
++     K[fromId][2] = cx;
++     K[fromId][3] = cy;
++  }
++
++  //Load Data
++  std::ifstream g2oFile;
++  std::string type;
++  std::map<int, int> landmarkId;
++  std::map<int, int> poseId;
++    g2oFile.open(argv[1]);
++    g2oFile >> poseNUM >> landmarkNUM >> edgeNUM;
++    pose.resize(poseNUM);
++    landmark.resize(landmarkNUM);
++    observation.resize(edgeNUM);
++    for(int i = 0; i < poseNUM; i++) {
++      g2oFile >> type >> fromId;
++      g2o::VertexSE3Expmap *vSE3 = new g2o::VertexSE3Expmap();
++      vSE3->setId(fromId);
++      if(i == 0) // setFixed change 0->1 because delta_H is not positive definite
++       vSE3->setFixed(true);
++      vSE3->read(g2oFile);
++      poseId[fromId] = i;  
++      pose[i] = vSE3;
++      optimizer.addVertex(vSE3);
++    }
++    for(int i = 0; i < landmarkNUM; i++) {
++      g2oFile >> type >> fromId;
++      g2o::VertexSBAPointXYZ *vPoint = new g2o::VertexSBAPointXYZ();
++      vPoint->setId(fromId);
++     // if(fromId == 4) // setFixed
++     //  vPoint->setFixed(true);
++      vPoint->setMarginalized(true);
++      vPoint->read(g2oFile);
++      landmarkId[fromId] = i;
++      landmark[i] = vPoint;
++      optimizer.addVertex(vPoint);
++    }
++    for(int i = 0; i < edgeNUM; i++) {
++      g2oFile >> type >> fromId >> toId;
++      g2o::EdgeSE3ProjectXYZ *e = new g2o::EdgeSE3ProjectXYZ();
++      e->setVertex(0, landmark[landmarkId[fromId]]);
++      e->setVertex(1, pose[poseId[toId]]);
++      e->read(g2oFile);
++      g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
++      e->setRobustKernel(rk);
++      rk->setDelta(sqrt(5.991));
++      e->fx = K[toId][0];
++      e->fy = K[toId][1];
++      e->cx = K[toId][2];
++      e->cy = K[toId][3];
++      observation[i] = e;
++      optimizer.addEdge(e);
++    }
++    g2oFile.close();
++  std::cout<<"=============== Final result =============== "<<std::endl;	
++  optimizer.setVerbose(false);    
++  optimizer.initializeOptimization();
++  optimizer.save("GBA_before.g2o");
++  optimizer.optimize(20);
++  optimizer.save("GBA_after.g2o");
++
++  return 0;
++}

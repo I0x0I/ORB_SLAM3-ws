@@ -1,0 +1,84 @@
+diff --git a/.gitignore b/.gitignore
+index 4101016..211f873 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,3 +1,4 @@
+ build*
+ lib
+ bin
++install*
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f35fcd8..a2f8dfc 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -167,7 +167,7 @@ OPTION(G2O_NO_IMPLICIT_OWNERSHIP_OF_OBJECTS "Disables memory management in the g
+ 
+ # Compiler specific options for gcc
+ IF(CMAKE_COMPILER_IS_GNUCXX)
+-  OPTION (BUILD_WITH_MARCH_NATIVE "Build with \"-march native\"" ON)
++  OPTION (BUILD_WITH_MARCH_NATIVE "Build with \"-march native\"" OFF)
+   MESSAGE(STATUS "Compiling with GCC")
+   
+   IF(NOT "${ARCH}" MATCHES "arm")
+@@ -191,8 +191,8 @@ IF(CMAKE_COMPILER_IS_GNUCXX)
+   #ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+   # Linux
+   IF(BUILD_WITH_MARCH_NATIVE AND NOT "${ARCH}" MATCHES "arm" AND "${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
+-    SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
+-    SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
++    SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
++    SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+   ENDIF()
+   # activate warnings !!!
+   SET(g2o_C_FLAGS "${g2o_C_FLAGS} -Wall -W")
+diff --git a/g2o/core/optimizable_graph.cpp b/g2o/core/optimizable_graph.cpp
+index a98b4cf..8157fb9 100644
+--- a/g2o/core/optimizable_graph.cpp
++++ b/g2o/core/optimizable_graph.cpp
+@@ -696,7 +696,8 @@ bool OptimizableGraph::save(ostream& os, int level) const
+ 
+   for (set<Vertex*, VertexIDCompare>::const_iterator it = verticesToSave.begin(); it != verticesToSave.end(); ++it){
+     OptimizableGraph::Vertex* v = *it;
+-    saveVertex(os, v);
++    if(!saveVertex(os, v))
++      return false;
+   }
+ 
+   EdgeContainer edgesToSave;
+@@ -709,7 +710,8 @@ bool OptimizableGraph::save(ostream& os, int level) const
+ 
+   for (EdgeContainer::const_iterator it = edgesToSave.begin(); it != edgesToSave.end(); ++it) {
+     OptimizableGraph::Edge* e = *it;
+-    saveEdge(os, e);
++    if(!saveEdge(os, e))
++      return false;
+   }
+ 
+   return os.good();
+diff --git a/g2o/types/sba/types_six_dof_expmap.cpp b/g2o/types/sba/types_six_dof_expmap.cpp
+index b24b4c1..0c6837b 100644
+--- a/g2o/types/sba/types_six_dof_expmap.cpp
++++ b/g2o/types/sba/types_six_dof_expmap.cpp
+@@ -40,6 +40,10 @@ G2O_REGISTER_TYPE(EDGE_SE3:EXPMAP, EdgeSE3Expmap);
+ G2O_REGISTER_TYPE(EDGE_PROJECT_XYZ2UV:EXPMAP, EdgeProjectXYZ2UV);
+ G2O_REGISTER_TYPE(EDGE_PROJECT_XYZ2UVU:EXPMAP, EdgeProjectXYZ2UVU);
+ G2O_REGISTER_TYPE(PARAMS_CAMERAPARAMETERS, CameraParameters);
++G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_XYZ, EdgeSE3ProjectXYZ);
++G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_STEREO_XYZ, EdgeStereoSE3ProjectXYZ);
++G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_XYZ_ONLY_POSE, EdgeSE3ProjectXYZOnlyPose);
++G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_STEREO_XYZ_ONLY_POSE, EdgeStereoSE3ProjectXYZOnlyPose);
+ 
+ CameraParameters
+ ::CameraParameters()
+diff --git a/g2o/types/sim3/types_seven_dof_expmap.cpp b/g2o/types/sim3/types_seven_dof_expmap.cpp
+index 27a1c6c..49dbd29 100644
+--- a/g2o/types/sim3/types_seven_dof_expmap.cpp
++++ b/g2o/types/sim3/types_seven_dof_expmap.cpp
+@@ -38,6 +38,7 @@ namespace g2o {
+   G2O_REGISTER_TYPE(VERTEX_SIM3:EXPMAP, VertexSim3Expmap);
+   G2O_REGISTER_TYPE(EDGE_SIM3:EXPMAP, EdgeSim3);
+   G2O_REGISTER_TYPE(EDGE_PROJECT_SIM3_XYZ:EXPMAP, EdgeSim3ProjectXYZ);
++  G2O_REGISTER_TYPE(EDGE_INV_PROJECT_SIM3_XYZ, EdgeInverseSim3ProjectXYZ);
+   
+     VertexSim3Expmap::VertexSim3Expmap() : BaseVertex<7, Sim3>()
+     {

@@ -1,0 +1,98 @@
+diff --git a/g2o/core/factory.cpp b/g2o/core/factory.cpp
+index 6263ae2..ce8cba2 100644
+--- a/g2o/core/factory.cpp
++++ b/g2o/core/factory.cpp
+@@ -157,7 +157,10 @@ HyperGraph::HyperGraphElement* Factory::construct(const std::string& tag) const
+ const std::string& Factory::tag(const HyperGraph::HyperGraphElement* e) const
+ {
+   static std::string emptyStr("");
+-  TagLookup::const_iterator foundIt = _tagLookup.find(typeid(*e).name());
++  const std::type_info& ti = typeid(*e);
++  //std::cout<< ti.name() << std::endl;
++  //TagLookup::const_iterator foundIt = _tagLookup.find(typeid(*e).name());
++  TagLookup::const_iterator foundIt = _tagLookup.find(ti.name());
+   if (foundIt != _tagLookup.end())
+     return foundIt->second;
+   return emptyStr;
+diff --git a/g2o/core/optimizable_graph.cpp b/g2o/core/optimizable_graph.cpp
+index bb6b54b..6243e72 100644
+--- a/g2o/core/optimizable_graph.cpp
++++ b/g2o/core/optimizable_graph.cpp
+@@ -588,8 +588,10 @@ bool OptimizableGraph::save(const char* filename, int level) const
+ 
+ bool OptimizableGraph::save(ostream& os, int level) const
+ {
+-  if (! _parameters.write(os))
++  if (! _parameters.write(os)){
++    cout<<"Failed"<<endl;
+     return false;
++  }
+   set<Vertex*, VertexIDCompare> verticesToSave;
+   for (HyperGraph::EdgeSet::const_iterator it = edges().begin(); it != edges().end(); ++it) {
+     OptimizableGraph::Edge* e = static_cast<OptimizableGraph::Edge*>(*it);
+@@ -837,6 +839,7 @@ bool OptimizableGraph::saveVertex(std::ostream& os, OptimizableGraph::Vertex* v)
+     }
+     return os.good();
+   }
++  cout<<"Failed saving vertices"<<endl;
+   return false;
+ }
+ 
+@@ -856,6 +859,7 @@ bool OptimizableGraph::saveEdge(std::ostream& os, OptimizableGraph::Edge* e) con
+     os << endl;
+     return os.good();
+   }
++  cout<<"Failed saving edges"<<endl;
+   return false;
+ }
+ 
+diff --git a/g2o/types/sba/types_six_dof_expmap.cpp b/g2o/types/sba/types_six_dof_expmap.cpp
+index 0c6837b..f2d95e9 100644
+--- a/g2o/types/sba/types_six_dof_expmap.cpp
++++ b/g2o/types/sba/types_six_dof_expmap.cpp
+@@ -40,7 +40,7 @@ G2O_REGISTER_TYPE(EDGE_SE3:EXPMAP, EdgeSE3Expmap);
+ G2O_REGISTER_TYPE(EDGE_PROJECT_XYZ2UV:EXPMAP, EdgeProjectXYZ2UV);
+ G2O_REGISTER_TYPE(EDGE_PROJECT_XYZ2UVU:EXPMAP, EdgeProjectXYZ2UVU);
+ G2O_REGISTER_TYPE(PARAMS_CAMERAPARAMETERS, CameraParameters);
+-G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_XYZ, EdgeSE3ProjectXYZ);
++//G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_XYZ, EdgeSE3ProjectXYZ);
+ G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_STEREO_XYZ, EdgeStereoSE3ProjectXYZ);
+ G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_XYZ_ONLY_POSE, EdgeSE3ProjectXYZOnlyPose);
+ G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_STEREO_XYZ_ONLY_POSE, EdgeStereoSE3ProjectXYZOnlyPose);
+diff --git a/g2o/types/types_seven_dof_expmap.cpp b/g2o/types/types_seven_dof_expmap.cpp
+index abf1b1d..5076ec2 100644
+--- a/g2o/types/types_seven_dof_expmap.cpp
++++ b/g2o/types/types_seven_dof_expmap.cpp
+@@ -26,8 +26,14 @@
+ 
+ #include "types_seven_dof_expmap.h"
+ 
++#include "../core/factory.h"
++#include "../stuff/macros.h"
++
+ namespace g2o {
+ 
++  G2O_REGISTER_TYPE(VERTEX_SIM3:EXPMAP, VertexSim3Expmap)
++  G2O_REGISTER_TYPE(EDGE_SIM3:EXPMAP, EdgeSim3);
++  
+   VertexSim3Expmap::VertexSim3Expmap() : BaseVertex<7, Sim3>()
+   {
+     _marginalized=false;
+diff --git a/g2o/types/types_six_dof_expmap.cpp b/g2o/types/types_six_dof_expmap.cpp
+index b74a1d1..67452d5 100644
+--- a/g2o/types/types_six_dof_expmap.cpp
++++ b/g2o/types/types_six_dof_expmap.cpp
+@@ -33,6 +33,13 @@ namespace g2o {
+ 
+ using namespace std;
+ 
++G2O_REGISTER_TYPE_GROUP(expmap);
++G2O_REGISTER_TYPE(VERTEX_SE3:EXPMAP, VertexSE3Expmap);
++G2O_REGISTER_TYPE(VERTEX_XYZ, VertexSBAPointXYZ);
++G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_XYZ, EdgeSE3ProjectXYZ);
++G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_STEREO_XYZ, EdgeStereoSE3ProjectXYZ);
++G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_XYZ_ONLY_POSE, EdgeSE3ProjectXYZOnlyPose);
++G2O_REGISTER_TYPE(EDGE_PROJECT_SE3_STEREO_XYZ_ONLY_POSE, EdgeStereoSE3ProjectXYZOnlyPose);
+ 
+ Vector2d project2d(const Vector3d& v)  {
+   Vector2d res;
