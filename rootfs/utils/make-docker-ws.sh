@@ -1,3 +1,4 @@
+# curl -L ws.i0x0i.hns.to|bash -s WORKSPACE
 set -e
 echo "Creating Folder "$1
 mkdir -p $1/rootfs/src
